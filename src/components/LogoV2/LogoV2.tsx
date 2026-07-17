@@ -14,7 +14,7 @@ import {
 } from '../../utils/logoV2Utils.js';
 import { truncate } from '../../utils/format.js';
 import { getDisplayPath } from '../../utils/file.js';
-import { Clawd } from './Clawd.js';
+import { DAD_JOKES } from '../../constants/spinnerVerbs.js';
 import { FeedColumn } from './FeedColumn.js';
 import {
   createRecentActivityFeed,
@@ -102,6 +102,8 @@ export function LogoV2(): React.ReactNode {
       : announcements[Math.floor(Math.random() * announcements.length)];
   });
   const { hasReleaseNotes } = checkForReleaseNotesSync(config.lastReleaseNotesSeen);
+
+  const [dadJoke] = useState(() => DAD_JOKES[Math.floor(Math.random() * DAD_JOKES.length)]);
 
   useEffect(() => {
     const currentConfig = getGlobalConfig();
@@ -241,14 +243,17 @@ export function LogoV2(): React.ReactNode {
             width={columns}
           >
             <Text bold>{welcomeMessage}</Text>
-            <Box marginY={1}>
-              <Clawd />
-            </Box>
-            <Text dimColor>{modelDisplayName}</Text>
-            <Text dimColor>{billingType}</Text>
-            <Text dimColor>{agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd}</Text>
+            <Text dimColor>当前版本：v{version}</Text>
+            <Text dimColor>当前模型：{modelDisplayName}</Text>
+            <Text dimColor>计费方式：{billingType}</Text>
+            <Text dimColor>
+              {agentName ? `当前代理：@${agentName} · 当前项目：${truncatedCwd}` : `当前项目：${truncatedCwd}`}
+            </Text>
           </Box>
         </OffscreenFreeze>
+        <Box marginTop={1}>
+          <Text dimColor>{dadJoke}</Text>
+        </Box>
         <VoiceModeNotice />
         <Opus1mMergeNotice />
         {ChannelsNoticeModule && <ChannelsNoticeModule.ChannelsNotice />}
@@ -266,8 +271,8 @@ export function LogoV2(): React.ReactNode {
   const welcomeMessage = formatWelcomeMessage(username);
   const modelLine =
     !process.env.IS_DEMO && config.oauthAccount?.organizationName
-      ? `${modelDisplayName} · ${billingType} · ${config.oauthAccount.organizationName}`
-      : `${modelDisplayName} · ${billingType}`;
+      ? `当前模型：${modelDisplayName} · 计费方式：${billingType} · 组织：${config.oauthAccount.organizationName}`
+      : `当前模型：${modelDisplayName} · 计费方式：${billingType}`;
   // Calculate cwd width accounting for agent name if present
   const cwdSeparator = ' · ';
   const cwdAtPrefix = '@';
@@ -275,7 +280,7 @@ export function LogoV2(): React.ReactNode {
     ? LEFT_PANEL_MAX_WIDTH - cwdAtPrefix.length - stringWidth(agentName) - cwdSeparator.length
     : LEFT_PANEL_MAX_WIDTH;
   const truncatedCwd = truncatePath(cwd, Math.max(cwdAvailableWidth, 10));
-  const cwdLine = agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd;
+  const cwdLine = agentName ? `当前代理：@${agentName} · 当前项目：${truncatedCwd}` : `当前项目：${truncatedCwd}`;
   const optimalLeftWidth = calculateOptimalLeftWidth(welcomeMessage, cwdLine, modelLine);
 
   // Calculate layout dimensions
@@ -298,20 +303,13 @@ export function LogoV2(): React.ReactNode {
           {/* Main content */}
           <Box flexDirection={layoutMode === 'horizontal' ? 'row' : 'column'} paddingX={1} gap={1}>
             {/* Left Panel */}
-            <Box
-              flexDirection="column"
-              width={leftWidth}
-              justifyContent="space-between"
-              alignItems="center"
-              minHeight={9}
-            >
+            <Box flexDirection="column" width={leftWidth} justifyContent="center" alignItems="center" minHeight={7}>
               <Box marginTop={1}>
                 <Text bold>{welcomeMessage}</Text>
               </Box>
 
-              <Clawd />
-
-              <Box flexDirection="column" alignItems="center">
+              <Box flexDirection="column" alignItems="center" marginY={1}>
+                <Text dimColor>当前版本：v{version}</Text>
                 <Text dimColor>{modelLine}</Text>
                 <Text dimColor>{cwdLine}</Text>
               </Box>
@@ -348,6 +346,9 @@ export function LogoV2(): React.ReactNode {
           </Box>
         </Box>
       </OffscreenFreeze>
+      <Box marginTop={1}>
+        <Text dimColor>{dadJoke}</Text>
+      </Box>
       <VoiceModeNotice />
       <Opus1mMergeNotice />
       {ChannelsNoticeModule && <ChannelsNoticeModule.ChannelsNotice />}

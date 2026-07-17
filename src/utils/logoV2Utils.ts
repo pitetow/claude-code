@@ -86,7 +86,7 @@ export function calculateOptimalLeftWidth(
     stringWidth(welcomeMessage),
     stringWidth(truncatedCwd),
     stringWidth(modelLine),
-    20, // Minimum for clawd art
+    16, // Minimum for left panel content
   )
   return Math.min(contentWidth + 4, MAX_LEFT_WIDTH) // +4 for padding
 }
@@ -245,7 +245,7 @@ export function getLogoDisplayData(): {
   billingType: string
   agentName: string | undefined
 } {
-  const version = process.env.DEMO_VERSION ?? MACRO.VERSION
+  const version = (process.env.DEMO_VERSION ?? MACRO.VERSION) + '-Luozy'
   const serverUrl = getDirectConnectServerUrl()
   const displayPath = process.env.DEMO_VERSION
     ? '/code/claude'

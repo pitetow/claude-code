@@ -126,6 +126,22 @@ function cleanupTerminalModes(): void {
         writeSync(1, CLEAR_TERMINAL_TITLE)
       }
     }
+    // Last-resort: force stdin out of raw mode. The Ink instance may already
+    // be unmounted (detachForShutdown skipped) or the handleSetRawMode(false)
+    // guard may have prevented raw mode from being disabled — both leave the
+    // terminal in a broken state (no echo, ISIG off). This call bypasses
+    // Ink's rawModeEnabledCount accounting entirely via the underlying TTY fd.
+    const stdin = process.stdin as typeof process.stdin & {
+      isRaw?: boolean
+      setRawMode?: (m: boolean) => void
+    }
+    if (stdin.isRaw && stdin.setRawMode) {
+      try {
+        stdin.setRawMode(false)
+      } catch {
+        // stdin may already be destroyed
+      }
+    }
   } catch {
     // Terminal may already be gone (e.g., SIGHUP after terminal close).
     // Ignore write errors since we're exiting anyway.

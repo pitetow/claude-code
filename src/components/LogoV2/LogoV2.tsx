@@ -67,6 +67,18 @@ import { useAppState } from '../../state/AppState.js';
 import { getEffortSuffix } from '../../utils/effort.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { renderModelSetting } from '../../utils/model/model.js';
+import { readFileSync } from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const parts = __dirname.split(path.sep);
+const distIdx = parts.lastIndexOf('dist');
+const bannerPath =
+  distIdx !== -1
+    ? path.join(parts.slice(0, distIdx + 1).join(path.sep), 'banner.txt')
+    : path.join(__dirname, 'banner.txt');
+const banner = readFileSync(bannerPath, 'utf-8');
 
 const LEFT_PANEL_MAX_WIDTH = 50;
 
@@ -149,6 +161,7 @@ export function LogoV2(): React.ReactNode {
   if (!hasReleaseNotes && !showOnboarding && !isEnvTruthy(process.env.CLAUDE_CODE_FORCE_FULL_LOGO)) {
     return (
       <>
+        <Text>{banner}</Text>
         <CondensedLogo />
         <VoiceModeNotice />
         <Opus1mMergeNotice />
@@ -226,6 +239,7 @@ export function LogoV2(): React.ReactNode {
     // any change while in scrollback forces a full reset.
     return (
       <>
+        <Text>{banner}</Text>
         <OffscreenFreeze>
           <Box
             flexDirection="column"
@@ -288,6 +302,7 @@ export function LogoV2(): React.ReactNode {
 
   return (
     <>
+      <Text>{banner}</Text>
       <OffscreenFreeze>
         <Box
           flexDirection="column"

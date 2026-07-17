@@ -276,7 +276,7 @@ export default class App extends PureComponent<Props, State> {
     this.handleExit(error);
   }
 
-  handleSetRawMode = (isEnabled: boolean): void => {
+  handleSetRawMode = (isEnabled: boolean, force = false): void => {
     const { stdin } = this.props;
 
     if (!this.isRawModeSupported()) {
@@ -353,28 +353,53 @@ export default class App extends PureComponent<Props, State> {
       return;
     }
 
-    // Disable raw mode only when no components left that are using it
-    if (--this.rawModeEnabledCount === 0) {
-      // Guard: React 19 runs new useLayoutEffect setup before old cleanup when
-      // replacing the tree (e.g., showSetupDialog → launchResumeChooser).
-      // If the old tree had more useInput hooks than the new tree, the old
-      // cleanup over-decrements the count to 0 even though the new tree has
-      // active listeners. Detect this and fix the count instead of disabling.
+    // Disable raw mode.
+    //
+    // Two paths:
+    //   Normal:  decrement refcount; disable raw mode only when all
+    //            components' useInput hooks have unregistered.
+    //   Forced:  user-initiated exit — skip the listener guard and
+    //            refcount so ISIG is re-enabled immediately. SIGINT
+    //            must work as a kernel-level backstop in case
+    //            Ink.unmount() hangs.
+    if (force) {
+      this.rawModeEnabledCount = 0;
+    } else if (--this.rawModeEnabledCount !== 0) {
+      return;
+    } else {
+      // Refcount reached zero — guard against React 19 running new
+      // useLayoutEffect setup before old cleanup when replacing the
+      // tree (e.g. showSetupDialog → launchResumeChooser). If the
+      // old tree had more useInput hooks than the new tree, the old
+      // cleanup over-decrements the count to 0 even though the new
+      // tree has active listeners. Detect and fix the count.
       const activeListeners = this.internal_eventEmitter.listenerCount('input');
       if (activeListeners > 0) {
         this.rawModeEnabledCount = activeListeners;
         return;
       }
+    }
 
-      this.props.stdout.write(DISABLE_MODIFY_OTHER_KEYS);
-      this.props.stdout.write(DISABLE_KITTY_KEYBOARD);
-      // Disable terminal focus reporting (DECSET 1004)
-      this.props.stdout.write(DFE);
-      // Disable bracketed paste mode
-      this.props.stdout.write(DBP);
+    // Actually disable raw mode and send terminal reset sequences.
+    // These writes are idempotent — terminals silently ignore unknown
+    // sequences, so double-sending (App + Ink.unmount + cleanupTerminalModes)
+    // is harmless.
+    this.props.stdout.write(DISABLE_MODIFY_OTHER_KEYS);
+    this.props.stdout.write(DISABLE_KITTY_KEYBOARD);
+    // Disable terminal focus reporting (DECSET 1004)
+    this.props.stdout.write(DFE);
+    // Disable bracketed paste mode
+    this.props.stdout.write(DBP);
+    try {
       stdin.setRawMode(false);
+    } catch {
+      // stdin may already be destroyed
+    }
+    try {
       stdin.removeListener('readable', this.handleReadable);
       stdin.unref();
+    } catch {
+      // stdin may already be destroyed
     }
   };
 
@@ -481,7 +506,12 @@ export default class App extends PureComponent<Props, State> {
 
   handleExit = (error?: Error): void => {
     if (this.isRawModeSupported()) {
-      this.handleSetRawMode(false);
+      // Force raw mode off so ISIG is re-enabled. The normal
+      // handleSetRawMode(false) path may skip setRawMode(false)
+      // because of the active-input-listener guard — during exit
+      // we must guarantee raw mode is off so SIGINT (kernel-level
+      // Ctrl+C) can act as a backstop if Ink.unmount() hangs.
+      this.handleSetRawMode(false, true);
     }
 
     this.props.onExit(error);

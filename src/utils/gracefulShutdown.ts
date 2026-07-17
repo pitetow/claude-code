@@ -81,6 +81,13 @@ function cleanupTerminalModes(): void {
     // Calling unmount() now does the final render on the alt buffer,
     // unsubscribes from signal-exit, and writes 1049l exactly once.
     const inst = instances.get(process.stdout)
+    // Detach first so that isUnmounted is already set when we call
+    // inst.unmount() below. If a prior unmount from useApp().exit is
+    // still in-flight and hung (e.g. stuck in onRender → yoga layout),
+    // the guarded unmount() will early-return instead of deadlocking
+    // on the same code path. detachForShutdown() also drains stdin
+    // and cancels any pending render, so it's safe to call early.
+    inst?.detachForShutdown()
     if (inst?.isAltScreenActive) {
       try {
         inst.unmount()
@@ -89,18 +96,13 @@ function cleanupTerminalModes(): void {
         // so printResumeHint still hits the main buffer.
         writeSync(1, EXIT_ALT_SCREEN)
       }
+      // If unmount early-returned because detachForShutdown set
+      // isUnmounted=true (hung prior unmount), write the alt-screen
+      // exit ourselves. The sequence is idempotent — harmless if
+      // unmount already wrote it (won't happen in this branch).
+      writeSync(1, EXIT_ALT_SCREEN)
     }
-    // Catches events that arrived during the unmount tree-walk.
-    // detachForShutdown() below also drains.
-    inst?.drainStdin()
-    // Mark the Ink instance unmounted so signal-exit's deferred ink.unmount()
-    // early-returns instead of sending redundant EXIT_ALT_SCREEN sequences
-    // (from its writeSync cleanup block + AlternateScreen's unmount cleanup).
-    // Those redundant sequences land AFTER printResumeHint() and clobber the
-    // resume hint on tmux (and possibly other terminals) by restoring the
-    // saved cursor position. Safe to skip full unmount: this function already
-    // sends all the terminal-reset sequences, and the process is exiting.
-    inst?.detachForShutdown()
+    // Catches any remaining events that arrived during the detach above.
     // Disable extended key reporting — always send both since terminals
     // silently ignore whichever they don't implement
     writeSync(1, DISABLE_MODIFY_OTHER_KEYS)

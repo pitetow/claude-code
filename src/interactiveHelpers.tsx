@@ -124,7 +124,32 @@ export function showSetupDialog<T = void>(
 export async function renderAndRun(root: Root, element: React.ReactNode): Promise<void> {
   root.render(element);
   startDeferredPrefetches();
-  await root.waitUntilExit();
+
+  // Wait for Ink.unmount() to complete, but don't wait forever.
+  // If the reconciler deadlocks or Yoga layout loops, unmount may
+  // never resolve, and without a timeout the process hangs with
+  // no recovery path (raw mode suppresses SIGINT). 5s is ample
+  // for even the heaviest terminal repaint.
+  //
+  // On timeout, proceed directly to gracefulShutdown which runs
+  // cleanupTerminalModes() (with last-resort setRawMode(false)
+  // to restore ISIG) and arms its own failsafe → forceExit.
+  const result = await Promise.race([
+    root.waitUntilExit().then(() => 'exit' as const),
+    new Promise<'timeout'>(resolve => setTimeout(resolve, 5000, 'timeout')),
+  ]);
+
+  if (result === 'timeout') {
+    try {
+      const { logForDebugging } = await import('./utils/debug.js');
+      logForDebugging('Ink waitUntilExit timed out — forcing graceful shutdown', {
+        level: 'warn',
+      });
+    } catch {
+      // debug module unavailable — ignore
+    }
+  }
+
   await gracefulShutdown(0);
 }
 

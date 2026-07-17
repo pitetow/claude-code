@@ -422,7 +422,7 @@ function ModeIndicator({
             dimColor={rssState.level === 'normal'}
             color={rssState.level === 'error' ? 'error' : rssState.level === 'warning' ? 'warning' : undefined}
           >
-            {rssState.text} · pid:{process.pid}
+            内存占用:{rssState.text} · 进程pid:{process.pid}
           </Text>,
         ]
       : []),
